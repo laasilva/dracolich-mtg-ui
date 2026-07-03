@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ----------------------------------------------------------------------- */
+/* Mystical background gradient — web only.                                 */
+/* RN can't render radial-gradient natively, so the body styling here only  */
+/* affects RN-Web. Native uses a plain background color set in              */
+/* app/_layout.tsx + the NavShell wrapper.                                  */
+/* ----------------------------------------------------------------------- */
+html,
+body {
+  background-color: #0c0a14;
+  background-image:
+    radial-gradient(
+      ellipse at top,
+      rgba(75, 50, 130, 0.28),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at bottom right,
+      rgba(40, 60, 130, 0.22),
+      transparent 55%
+    );
+  background-attachment: fixed;
+  color: #ece9df;
+  /* Cinzel everywhere — matches the v0 design exploration. Loaded font
+     names from @expo-google-fonts/cinzel resolve first; serif is the
+     pre-load fallback so headings don't pop in. */
+  font-family: "Cinzel_400Regular", "Cinzel", serif;
+}
+
+/* Web-only gesture hardening.
+ *
+ * overscroll-behavior-x: none → kills the browser's swipe-back/forward
+ *   navigation gesture (macOS trackpads, mice with horizontal scroll).
+ * img user-drag: none → disables native HTML5 image-drag-as-file, which
+ *   hijacks pointermove before our Pan gesture handler can claim it.
+ *   pointer-events stays auto so taps still flow to the Pressable.
+ */
+html,
+body {
+  overscroll-behavior-x: none;
+}
+
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+/* ----------------------------------------------------------------------- */
+/* Custom scrollbar — web only. Matches the mystical palette.              */
+/* ----------------------------------------------------------------------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2d2540 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #2d2540;
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #6f4dae;
+}
