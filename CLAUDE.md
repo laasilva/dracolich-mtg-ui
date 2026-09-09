@@ -2,7 +2,9 @@
 
 Phase 4 frontend for the MTG deck builder. Single Expo codebase targeting **iOS, Android, and web**. Replaces the scrapped `dracolich-ui` (which served the unrelated D&D compendium).
 
-Vision spec lives in memory (`project_mtg_ui_vision.md`); this file documents the **shipped implementation** and durable cross-platform patterns.
+This file documents the **shipped implementation** and durable cross-platform patterns. For the
+cross-repo picture — service topology, release pipeline, backend conventions — see the workspace
+guide at `~/Dev/Dracolich/CLAUDE.md`.
 
 ## Stack
 
@@ -31,7 +33,14 @@ npx expo start --tunnel     # for testing on a phone over the internet
 EXPO_PUBLIC_API_BASE=https://dev.dracolich.app
 ```
 
-The base URL fans out per-service inside `lib/api.ts` (`/dracolich/mtg-library/...`, `/dracolich/user/...`, etc.).
+`lib/env.ts` throws at import time if it is unset, and fans the base URL out per service
+(`/dracolich/user/api/v0`, `/dracolich/mtg-library/api/v0`, `/dracolich/mtg-deck-builder/api/v0`).
+The usual setup is the app running locally against the deployed dev environment. Pointing it at a
+locally-run service is fine when developing against one — the preference is just not to run the whole
+backend ecosystem locally by default.
+
+There is deliberately **no ai-api client**: ai-api is internal, and all AI features are reached
+through `api.deckBuilder("/ai/...")`.
 
 ## Routing
 
@@ -44,10 +53,24 @@ app/
 ├── signup.tsx                  modal route
 └── (app)/                      route group — wrapped in NavShell
     ├── _layout.tsx             renders <NavShell><Slot /></NavShell>
-    ├── index.tsx               (home — TBD)
-    ├── cards.tsx               cards list (currently API smoke test + CardTile preview)
-    ├── decks.tsx               (TBD)
-    └── sets.tsx                (TBD)
+    ├── index.tsx               dashboard (recent decks, popular decks, card of the day, stats rail)
+    ├── sets.tsx                UnderConstruction stub (Phase 4.4)
+    ├── cards/
+    │   ├── index.tsx           search + filter chips, paginated results
+    │   └── [id].tsx            card detail
+    ├── decks/
+    │   ├── index.tsx           deck list
+    │   ├── new.tsx             wizard step 1 — format + name + commander + optional import
+    │   └── [id]/
+    │       ├── index.tsx       deck detail
+    │       ├── build.tsx       wizard step 2 — two-pane search + live deck + AI suggestions
+    │       ├── review.tsx      wizard step 3 — solitaire-style pile gallery, read-only
+    │       └── finalize.tsx    wizard step 4 — metadata, visibility, status
+    └── account/
+        ├── index.tsx           profile
+        ├── decks.tsx           my decks
+        ├── favorites.tsx       favorited decks
+        └── settings.tsx        settings
 ```
 
 The `(app)` group is the authenticated/main app shell. Login/signup are siblings rendered as modals so navigating to them doesn't lose the underlying app state.
@@ -72,7 +95,10 @@ GestureHandlerRootView           reanimated needs this at the absolute root
 - JWT decoded client-side to populate `user` (id, username) — verification stays server-side
 - `register()` returns `{ autoSignedIn: true } | { autoSignedIn: false; message: string }` so the signup screen knows whether to close the modal or show "check your email"
 - `logout()` is gated by a themed confirm dialog (see `confirmDialog` below)
-- Refresh-token rotation: deferred. Current behavior is "JWT expires → 401 → user re-logs in"
+- **Refresh-token rotation ships** in `lib/api.ts`: a 401 on any non-`/auth/*` request triggers a
+  single-flight silent refresh and one retry of the original request. Concurrent 401s all await the
+  same promise. On refresh failure the tokens are purged and `onSessionExpired` (registered by
+  `AuthProvider` via `setOnSessionExpired`) fires so React state matches reality.
 
 ## Themed confirm dialog (`lib/dialogs.ts` + `components/dialog-provider.tsx`)
 
@@ -166,20 +192,18 @@ These have bitten us at least once each. Trust this list before re-deriving:
 
 ## Status
 
-**Phase 4.1 — Foundation**: ✅ done. Auth flow, nav, theming, API client, dialog system, env config, splash routing.
+**Phase 4.1 — Foundation**: ✅ done. Auth flow (incl. silent refresh), nav, theming, API client, dialog system, env config, splash routing.
 
-**Phase 4.2 — Cards**: in progress.
+**Phase 4.2 — Cards**: ✅ done except one backend-blocked item.
 - [x] `CardTile` (carousel + list)
-- [x] Cards screen smoke test rendering both modes
 - [x] `ManaCost` + `useSymbol` query — SVG mana symbols via mtg-library-api `/symbols`
 - [x] `CardCarousel` (the showpiece — see notes below)
 - [x] `CarouselIndicator` (auto-fading dots / progress bar with live SV-driven highlight)
 - [x] `CardBack` (placeholder MTG-style face-down asset)
-- [ ] Search bar + filter chips
-- [ ] Cards search screen (paginated)
-- [ ] Card detail — web (right rail slide-in)
-- [ ] Card detail — mobile (bottom sheet)
-- [ ] Art-version scroller (needs `GET /cards/{id}/arts` on mtg-library-api — backend gap)
+- [x] Search bar + filter chips (`search-bar.tsx`, `filter-chips.tsx`, `search-suggestions.tsx`, `lib/search.tsx`)
+- [x] Cards search screen (paginated)
+- [x] Card detail — web right rail (`card-detail-panel.tsx`) and mobile bottom sheet (`card-detail-sheet.tsx`), sharing `card-detail-content.tsx`
+- [ ] Art-version scroller — **blocked**: needs `GET /cards/{id}/arts` on mtg-library-api
 
 ### CardCarousel notes
 
@@ -196,17 +220,25 @@ These have bitten us at least once each. Trust this list before re-deriving:
 
 Key constants in the file (tunable): `SPACING_FACTOR` (slot width), `SWIPE_COMMIT_FRACTION` (min projection to commit), `VELOCITY_DECAY` (kinetic-inertia coefficient), `PARALLAX_TILT` (max degrees on mouse hover), `GLOW_*` / `SHADOW_OVERLAY_MAX_OPACITY` (visual intensity), `VISIBLE_OFFSETS` (render window — sorted by `|offset|` descending so active renders last for iOS layer-order fallback).
 
-**Phase 4.3 — Decks**: not started.
+**Phase 4.3 — Decks**: largely shipped.
+- [x] Deck list (`decks/index.tsx`) and deck detail (`decks/[id]/index.tsx`)
+- [x] 4-step creation wizard: `new` → `build` → `review` → `finalize`
+- [x] `build.tsx` — two-pane debounced card search + live deck contents, click-to-add
+- [x] Deck components: `deck-tile`, `deck-header`, `deck-contents`, `deck-stats-panel`, `deck-art-mosaic`, `deck-card-sheet`, `deck-pile-grid`, `deck-pile-view`, `stack-editor-sheet`
+- [x] AI suggest / analyze via `useDeckAiSuggest` / `useDeckAiAnalyze` → `api.deckBuilder("/ai/decks/{id}/...")`
+- [x] Account screens: profile, my decks, favorites, settings
+- [ ] Drag-and-drop adds on the build screen (click-to-add handler is what the drop target would call)
+- [ ] iOS pile-mode polish (see gotcha 14)
 
-**Phase 4.4 — Sets**: not started.
+**Phase 4.4 — Sets**: not started — `/sets` is an `UnderConstruction` stub. Current priority.
 
 **Phase 4.5 — Ship to stores**: not started.
 
 ## Backend gaps blocking the frontend
 
-Capture here so we don't lose them:
+Capture here so we don't lose them. **These are the current top priority**, ahead of Phase 4.4:
 
 - `mtg-library-api`: `GET /cards/{id}/arts` (or `arts: []` on the detail response) — currently only `defaultArt` ships, breaks the art-version scroller.
 - `mtg-library-api`: `/{id}` route eats `/search` on some matches → add a regex constraint or reorder.
-- `dracolich-mtg-deck-builder-api`: favorite-cards endpoint (planned post-Phase 4 per vision memo).
+- `dracolich-mtg-deck-builder-api`: favorite-cards endpoint (only favorite *decks* exists today).
 - `dracolich-user-api`: username → userId lookup, so public profile URLs can be `/users/{username}/...` instead of opaque IDs.

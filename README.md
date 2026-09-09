@@ -1,50 +1,57 @@
-# Welcome to your Expo app 👋
+# dracolich-mtg-ui
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+The frontend for the Dracolich Magic: The Gathering deck-building platform. A single
+[Expo](https://expo.dev) codebase targeting **iOS, Android, and web**.
+
+For architecture, shipped feature status, and the cross-platform gotchas list, see
+[`CLAUDE.md`](./CLAUDE.md). For the cross-repo picture — service topology, release pipeline, backend
+conventions — see the workspace guide at `~/Dev/Dracolich/CLAUDE.md`.
+
+## Prerequisites
+
+- Node 18+
+- An `.env` at the project root (copy `.env.example`)
 
 ## Get started
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
 ```bash
-npm run reset-project
+npm install
+npx expo start           # dev menu: i = iOS, a = Android, w = web
+npx expo start --web     # web only
+npx expo start --tunnel  # test on a physical phone over the internet
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Configuration
 
-## Learn more
+```
+EXPO_PUBLIC_API_BASE=https://dev.dracolich.app
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+The `EXPO_PUBLIC_` prefix is required to expose the variable to the bundle, and the value is **baked
+in at bundle time** — restart `expo start` after changing it. `lib/env.ts` throws at import time if
+it is unset, and fans the base URL out per service.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+The usual setup points the app at the deployed dev environment. Pointing it at locally-run services
+works too when developing against one.
 
-## Join the community
+## Layout
 
-Join our community of developers creating universal apps.
+```
+app/          expo-router file-based route tree ((app) group is the main shell,
+              login/signup are sibling modal routes)
+components/   presentational + interactive components
+lib/          api client, auth, storage, dialogs, feedback, TanStack Query hooks
+assets/       icons and splash images
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Stack
+
+Expo SDK 54 · Expo Router 6 · React Native 0.81 · react-native-web 0.21 · NativeWind v4 +
+Tailwind 3.4 · TanStack Query 5 · react-hook-form + zod · axios · Reanimated 4 · expo-image ·
+expo-secure-store.
+
+## Lint
+
+```bash
+npm run lint
+```
